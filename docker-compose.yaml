@@ -1,0 +1,69 @@
+version: '3.3'
+
+services:
+  postgres:
+    image: postgres:13.3
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - .env
+
+  redis: 
+    image: redis:6.2.6-alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build: ./backend
+    restart: always
+    volumes:
+      - static_value:/app/static/
+      - media_value:/app/media/
+    depends_on:
+      - redis
+      - postgres
+    env_file:
+      - .env
+    
+  celery:
+    build: ./backend
+    restart: always
+    command: celery -A backend worker -B
+    volumes:
+      - static_value:/app/static/
+    depends_on:
+      - redis
+      - postgres
+      - backend
+    env_file:
+      - .env
+
+  nginx:
+    image: nginx:1.21.3-alpine
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - static_value:/var/html/static/
+      - media_value:/var/html/media/
+    depends_on:
+      - backend
+  
+  frontend:
+    build: ./frontend/bot
+    restart: always
+    depends_on:
+      - nginx
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_value:
+  media_value:
