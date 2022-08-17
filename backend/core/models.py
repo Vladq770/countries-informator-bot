@@ -1,166 +1,57 @@
 from django.db import models
 
 
-class Specialisation(models.Model):
-    PY = "Python"
-    PHP = "PHP"
-    GO = "Go"
-    BIT = "Bitrix"
-    JA = "Java"
-    TEST = "Тестирование"
-    AN = "Аналитика"
-    DE = "Design"
-    NAMES = [
-        (PY, "Python"),
-        (PHP, "PHP"),
-        (GO, "Go"),
-        (BIT, "Bitrix"),
-        (JA, "Java"),
-        (TEST, "Тестирование"),
-        (AN, "Аналитика"),
-        (DE, "Design"),
-    ]
-    name = models.CharField("Название специализации", max_length=64, choices=NAMES)
-    priority = models.IntegerField("Приоритет эксперта")
+class Countries(models.Model):
+    name = models.CharField(max_length=64, verbose_name='Название страны')
+    fullname = models.CharField(max_length=255, default='', verbose_name='Полное название страны')
+    english = models.CharField(max_length=64, default='', verbose_name='Название страны на английском')
+    id_country = models.CharField(max_length=2, blank=True, verbose_name='id страны, двухбуквенная система ISO Alpha2')
+    country_code3 = models.CharField(max_length=3, default='', verbose_name='id страны, трёхбуквенная система ISO Alpha3')
+    iso = models.IntegerField(default=0, verbose_name='Код  страны ISO numeric, трёхцифровая система')
+    telcod = models.IntegerField(default=0, verbose_name='Телефонный код')
+    telcod_len = models.IntegerField(default=0, verbose_name='Длина номера телефона')
+    location = models.CharField(max_length=10, blank=True, verbose_name='Часть света')
+    capital = models.IntegerField(default=1, blank=True, verbose_name='Количество столиц')
+    mcc = models.IntegerField(default=0, verbose_name='Код страны телефонных операторов')
+    lang = models.CharField(max_length=64, blank=True, verbose_name='Оснвной язык')
+    langcod = models.CharField(max_length=12, blank=True, verbose_name='Код языка')
+    time_zone = models.IntegerField(default=0, verbose_name='Часовой пояс')
+    tz = models.CharField(max_length=50, blank=True, verbose_name='Часовой пояс, буквенное обозначение')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Занеесено в БД')
 
     def __str__(self):
         return self.name
 
     class Meta:
-        verbose_name = "Специализация"
-        verbose_name_plural = "Специализации"
-        constraints = (
-            models.UniqueConstraint(
-                fields=("name", "priority"),
-                name="unique_specialisation",
-            ),
-        )
+        verbose_name = 'Страна(ы)'
+        verbose_name_plural = 'Страны'
+        ordering = ['-created_at']
 
 
-class Slot(models.Model):
-    MON = "пн"
-    TUE = "вт"
-    WED = "ср"
-    THU = "чт"
-    FRI = "пт"
-    SAT = "сб"
-    SUN = "вс"
-    DAYS = [
-        (MON, "пн"),
-        (TUE, "вт"),
-        (WED, "ср"),
-        (THU, "чт"),
-        (FRI, "пт"),
-        (SAT, "сб"),
-        (SUN, "вс"),
-    ]
-    day = models.CharField("День недели", max_length=16, choices=DAYS)
-    hour = models.IntegerField("Час слота")
-
-    def __str__(self):
-        if self.hour <= 9:
-            return f"{self.day} - 0{self.hour}:00"
-        return f"{self.day} - {self.hour}:00"
-
-    class Meta:
-        verbose_name = "Слот"
-        verbose_name_plural = "Слоты"
-        constraints = (
-            models.UniqueConstraint(
-                fields=("day", "hour"),
-                name="unique_slot",
-            ),
-        )
-
-
-class User(models.Model):
-    EXP = "EXPERT"
-    HR = "HR"
-    ADM = "ADMIN"
-    POSITIONS = [
-        (EXP, "Эксперт"),
-        (HR, "HR-специалист"),
-        (ADM, "Админ"),
-    ]
-    name = models.CharField("Фамилия и имя", max_length=64)
-    tg_id = models.BigIntegerField("ID пользователя", unique=True)
-    specialisation = models.OneToOneField(
-        Specialisation,
-        blank=True,
-        null=True,
-        related_name="users",
-        on_delete=models.CASCADE,
-    )
-    slots = models.ManyToManyField(Slot, blank=True, related_name="users")
-    position = models.CharField("Позиция", max_length=32, choices=POSITIONS)
+class Cities(models.Model):
+    country = models.ForeignKey(Countries, on_delete=models.PROTECT, verbose_name='Страна')
+    name = models.CharField(max_length=64, verbose_name='Название страны')
+    area = models.IntegerField(default=0, verbose_name='Область')
+    telcod = models.IntegerField(verbose_name='Телефонные коды')
+    latitude = models.FloatField(null=True, blank=True, verbose_name='Широта')
+    longitude = models.FloatField(null=True, blank=True, verbose_name='Долгота')
+    time_zone = models.FloatField(default=0, verbose_name='Время относительно UTC(GMT)')
+    tz = models.CharField(max_length=64, verbose_name='Часовой пояс, буквенное обозначение')
+    english = models.CharField(max_length=64, blank=True, verbose_name='Название города на английском')
+    rajon = models.IntegerField(default=0, verbose_name='Район области')
+    sub_rajon = models.IntegerField(default=0, verbose_name='Подрайон в райне')
+    iso = models.CharField(max_length=3, verbose_name='id города, трёхбуквенная система ISO Alpha3')
+    vid = models.IntegerField(default=0, verbose_name='1-город, 2-поселок, 3-село, 4-деревня, 5-станица, 6-хутор')
+    post = models.CharField(max_length=256, default='', verbose_name='Почтовый код')
+    wiki = models.CharField(max_length=1024, blank=True, verbose_name='Cсылка на wikipedia без https://')
+    full_english = models.CharField(max_length=100, verbose_name='Название города на английском')
+    full_name = models.CharField(max_length=100, verbose_name='Полное название города')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Занеесено в БД')
 
     def __str__(self):
         return self.name
 
     class Meta:
-        verbose_name = "Пользователь"
-        verbose_name_plural = "Пользователи"
-
-
-class Interview(models.Model):
-    slot = models.ForeignKey(Slot, related_name="interviews", on_delete=models.CASCADE)
-    date = models.DateField("Дата интервью")
-    expert = models.ForeignKey(
-        User,
-        related_name="expert_interviews",
-        blank=True,
-        null=True,
-        on_delete=models.CASCADE,
-    )
-    hr = models.ForeignKey(
-        User,
-        related_name="hr_interviews",
-        blank=True,
-        null=True,
-        on_delete=models.CASCADE,
-    )
-    message = models.TextField("Сообщение рекрутера с дополнительной информацией")
-    file = models.FileField(
-        verbose_name="Файл резюме", upload_to="cvs/", blank=True, null=True
-    )
-
-    def __str__(self):
-        return f"{self.slot} - {self.date}"
-
-    class Meta:
-        verbose_name = "Интервью"
-        verbose_name_plural = "Интервью"
-
-
-class Solution(models.Model):
-    ACC = "Принять"
-    OTH = "Предложить другое время"
-    SKIP = "Пропустить"
-    REF = "Отказаться"
-    SKIP_SEC = "Пропустить второй раз"
-    REF_CANDIDATE = "Отказаться от кандидата"
-    TYPES = [
-        (ACC, "Принять"),
-        (OTH, "Предложить другое время"),
-        (SKIP, "Пропустить"),
-        (REF, "Отказаться"),
-        (SKIP_SEC, "Пропустить второй раз"),
-        (REF_CANDIDATE, "Отказаться от кандидата"),
-    ]
-    type = models.CharField("Тип решения", max_length=32, choices=TYPES)
-    date = models.DateField("Дата решения")
-    comment = models.CharField("Комментарий", max_length=128, blank=True)
-    expert = models.ForeignKey(
-        User,
-        related_name="solutions",
-        on_delete=models.CASCADE,
-    )
-
-    def __str__(self):
-        if self.comment:
-            return f"{self.type} - {self.date} - {self.comment}"
-        return f"{self.type} - {self.date}"
-
-    class Meta:
-        verbose_name = "Решение"
-        verbose_name_plural = "Решения"
+        verbose_name = 'Город(а)'
+        verbose_name_plural = 'Города'
+        ordering = ['-created_at']
