@@ -27,7 +27,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-kw72j_4i0kv_+a8=0ayq4$1q0tyl7s@)$i5(8bmp*l&r+$_1f^"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ["127.0.0.1", "localhost", "backend"]  # имя контейнера
 
