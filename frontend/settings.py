@@ -1,7 +1,7 @@
 import pathlib
 from functools import lru_cache
 from typing import Union
-
+import os
 from aiohttp import ClientTimeout
 from pydantic import validator, BaseSettings
 
@@ -10,7 +10,8 @@ BASE_DIR = pathlib.Path(__file__).parent
 
 class EnvSettings(BaseSettings):
     class Config(BaseSettings.Config):
-        env_file = "../.env"
+        if os.environ.get("STAGE", "DEV") == "DEV":
+            env_file = "../.env"
 
 
 class BotSettings(EnvSettings):
