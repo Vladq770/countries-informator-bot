@@ -14,4 +14,4 @@ COPY . /app
 # run entrypoint.sh
 ENTRYPOINT ["/app/entrypoint.sh"]
 
-CMD ["gunicorn", "backend.wsgi:application", "--bind", "0:7000" ] 
+CMD ["daphne", "backend.asgi:application", "--bind", "0:7000" ]

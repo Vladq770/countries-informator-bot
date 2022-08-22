@@ -15,11 +15,11 @@ ENV STAGE=${STAGE} \
 RUN pip install "poetry==$POETRY_VERSION"
 
 # Copy only requirements to cache them in docker layer
-COPY app/poetry.lock app/pyproject.toml ./
+COPY ./poetry.lock ./pyproject.toml ./
 
 # Project initialization:
 RUN poetry config virtualenvs.create false \
   && poetry install $(test "$STAGE" == production && echo "--no-dev") --no-interaction --no-ansi
 
 # Creating folders, and files for a project:
-COPY app/ .
+COPY ./ .

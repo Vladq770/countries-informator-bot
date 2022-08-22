@@ -1,11 +1,11 @@
 """Start file of app"""
 # !/usr/bin/env python
 from aiogram import executor
-
+from aiogram.types import Message
 from handlers import dp
 from utils.dependencies import get_aiohttp_client_session
 
-from frontend.utils.setup_logging import setup_logging
+from utils.setup_logging import setup_logging
 
 
 async def on_startup(dispatcher):
