@@ -1,142 +1,132 @@
 import os
 from dotenv import load_dotenv
-import aiohttp
-from django.http import HttpResponse, HttpResponseNotFound
-#from django.core.cache import cache
-from .models import Cities, Countries, Weather
-import json
+from rest_framework.response import Response
+from .HTTPclient import HTTPClient, HTTPError
+from core.APICLients.externalAPI import city_country, weather, currency
+from core.APICLients.externalAPIForTests import cityTest, weatherTest, currencyTest
+from .models import City, Country
 import redis
+from rest_framework import status
+from rest_framework.decorators import api_view
+import json
+from .serializers import CitySerializer, CountrySerializer
+
 
 load_dotenv()
 
+
+URL_WEATHER = os.getenv("URL_WEATHER")
+URL_CITY = os.getenv("URL_CITY")
+URL_CURRENCY = os.getenv("URL_CURRENCY")
 CITY_TOKEN = os.getenv("CITY_TOKEN")
 WEATHER_TOKEN = os.getenv("WEATHER_TOKEN")
 CURRENCY_TOKEN = os.getenv("CURRENCY_TOKEN")
 REDIS_HOST = os.getenv("REDIS_HOST")
 REDIS_PORT = os.getenv("REDIS_PORT")
+REDIS_EXPIRATION_TIME = int(os.getenv("REDIS_EXPIRATION_TIME"))
+TEST = os.getenv("TEST")
 
-CURRENCIES = {
-    'AU': 'AUD', 'AZ': 'AZN', 'GB': 'GBR', 'AM': 'AMD', 'BY': 'BYN', 'BG': 'BGN', 'BR': 'BRL', 'HU': 'HUF', 'CN': 'CNY',
-    'DK': 'DKK', 'US': 'USD', 'IN': 'INR', 'KZ': 'KZT', 'CA': 'CAD', 'KG': 'KGS', 'MD': 'MDL', 'NO': 'NOK', 'PL': 'PLN',
-    'RO': 'RON', 'SG': 'SGD', 'TJ': 'TJS', 'TR': 'TRY', 'UZ': 'UZS', 'UA': 'UAH', 'CZ': 'CZK', 'SE': 'SEK', 'CH': 'CHF',
-    'ZA': 'ZAR', 'KR': 'KRW', 'JP': 'JPY', 'RU': 'USD'
-}
+if TEST == "True":
+    weather = weatherTest
+    city_country = cityTest
+    currency = currencyTest
 
+client_weather = weather.WeatherExternalAPIClient(
+    HTTPClient(URL_WEATHER, extra_request_params={"headers":
+                                                      {"X-Yandex-API-Key": WEATHER_TOKEN}})
+)
+client_currency = currency.CurrencyExternalAPIClient(HTTPClient(URL_CURRENCY))
+client_city = city_country.CityExternalAPIClient(HTTPClient(URL_CITY), CITY_TOKEN)
 redis_instance = redis.StrictRedis(host=REDIS_HOST, port=int(REDIS_PORT))
 
 
+@api_view(['GET'])
 def index(request):
-    return HttpResponse("Test")
+    d = {'test': 1, 'TEST': 'qwerty'}
+    return Response(d)
 
 
-async def get_city(name):
-    list_city = []
-    async with aiohttp.ClientSession() as session:
-        async with session.get(f'http://htmlweb.ru/geo/api.php?city_name={name}&json&api_key'
-                               f'={CITY_TOKEN}') as resp:
-            try:
-                cities = await resp.json()
-            except:
-                return None
-            for i in range(len(cities) - 2):
-
-                country = Countries.objects.filter(id_country=cities[str(i)]['country']).first()
-                if not country:
-                    country = await get_country(cities[str(i)]['country'])
-                    country.save()
-                try:
-                    city = Cities(country=country, name=cities[str(i)]['name'], area=cities[str(i)]['area'],
-                                  telcod=cities[str(i)]['telcod'], latitude=cities[str(i)]['latitude'],
-                                  longitude=cities[str(i)]['longitude'], time_zone=cities[str(i)]['time_zone'],
-                                  tz=cities[str(i)]['tz'], english=cities[str(i)]['english'],
-                                  rajon=cities[str(i)]['rajon'], sub_rajon=cities[str(i)]['sub_rajon'],
-                                  iso=cities[str(i)]['iso'], vid=cities[str(i)]['vid'],
-                                  post=cities[str(i)]['post'], full_english=cities[str(i)]['full_english'],
-                                  full_name=cities[str(i)]['full_name'])
-                except:
-                    city = Cities(country=country, name=cities[str(i)]['name'], full_name=cities[str(i)]['full_name'])
-                if cities[str(i)]['wiki']:
-                    city.wiki = cities[str(i)]['wiki']
-                city_check = Cities.objects.filter(full_name=city.full_name)
-                if not city_check:
-                    city.save()
-                list_city.append(city)
-            return list_city
+def get_city_from_api(name):
+    cities = {}
+    index_city = 0
+    try:
+        data = client_city.get_city(name)
+    except HTTPError:
+        return None
+    for city_from_api in data:
+        country = Country.objects.filter(id_country=city_from_api['country']).first()
+        if not country:
+            country = Country(**get_country_from_api(city_from_api['country'], save=False))
+            country.save()
+        code = city_from_api.pop('country')
+        city = City(country=country, **city_from_api)
+        city_check = City.objects.filter(full_name=city.full_name)
+        if not city_check:
+            city.save()
+        city_from_api['country'] = code
+        cities[str(index_city)] = city_from_api
+        index_city += 1
+    return cities
 
 
-async def get_country(name):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(f'https://htmlweb.ru/geo/api.php?country={name}&info&json&api_key'
-                               f'={CITY_TOKEN}') as resp:
-            c = await resp.json()
-            if len(c) > 5:
-                try:
-                    country = Countries(name=c['country']['name'],
-                                        english=c['country']['english'], fullname=c['country']['fullname'],
-                                        id_country=c['country']['id'], country_code3=c['country']['country_code3'],
-                                        iso=c['country']['iso'], telcod=c['country']['telcod'],
-                                        location=c['country']['location'],
-                                        mcc=c['country']['mcc'], capital=c['capital']['name'],
-                                        lang=c['country']['lang'], langcod=c['country']['langcod'],
-                                        time_zone=c['time_zone'], tz=c['tz'])
-                except:
-                    country = Countries(name=c['country']['name'],
-                                        id_country=c['country']['id'])
-                country_check = Countries.objects.filter(name=country.name)
-                if not country_check:
-                    country.save()
-                return country
-            return None
+def get_country_from_api(name, save=True):
+    try:
+        data = client_city.get_country(name)
+    except HTTPError:
+        return None
+    country = Country(**data)
+    country_check = Country.objects.filter(name=country.name)
+    if not country_check and save:
+        country.save()
+    return data
 
 
-async def get_city_country(request, name, *args, **kwargs):
-    country = Countries.objects.filter(name=name)
-    if country:
-        return HttpResponse(country)
-    cities = Cities.objects.filter(name=name)
-    if cities:
-        return HttpResponse(list(cities))
-    country = await get_country(name)
-    if country:
-        return HttpResponse(country)
-    cities = await get_city(name)
-    if cities:
-        return HttpResponse(cities)
-    return HttpResponseNotFound()
+@api_view(['GET'])
+def get_city(request, name, *args, **kwargs):
+    if cities := City.objects.filter(name=name):
+        cities_response = {}
+        index_city = 0
+        for city in cities:
+            serializer = CitySerializer(city)
+            cities_response[str(index_city)] = serializer.data
+            cities_response[str(index_city)]["country"] = city.country.id_country
+            index_city += 1
+        return Response(cities_response)
+    if cities := get_city_from_api(name):
+        return Response(cities)
+    return Response(status=status.HTTP_404_NOT_FOUND)
 
 
-async def get_weather(request, latitude, longitude, *args, **kwargs):
-    url_yandex = f'https://api.weather.yandex.ru/v2/forecast?lat={latitude}&lon={longitude}&extra=true'
-    if f'{latitude}{longitude}' in redis_instance:
-        return HttpResponse(redis_instance.get(f'{latitude}{longitude}'))
-    async with aiohttp.ClientSession(trust_env=True) as session:
-        async with session.get(url_yandex, headers={'X-Yandex-API-Key': WEATHER_TOKEN}) as resp:
-            try:
-                data = await resp.read()
-            except:
-                return HttpResponseNotFound()
-            w = json.loads(data)
-            weather = Weather(latitude=latitude, longitude=longitude, temp=w['fact']['temp'],
-                              feels_like=w['fact']['feels_like'], condition=w['fact']['condition'],
-                              wind_speed=w['fact']['wind_speed'], wind_gust=w['fact']['wind_gust'],
-                              wind_dir=w['fact']['wind_dir'], pressure_mm=w['fact']['pressure_mm'],
-                              humidity=w['fact']['humidity'])
-            redis_instance.set(f'{latitude}{longitude}', str(weather), 1000)
-    return HttpResponse(weather)
+@api_view(['GET'])
+def get_country(request, name, *args, **kwargs):
+    if country := Country.objects.filter(name=name).first():
+        serializer = CountrySerializer(country)
+        return Response(serializer.data)
+    if country := get_country_from_api(name):
+        return Response(country)
+    return Response(status=status.HTTP_404_NOT_FOUND)
 
 
-async def get_currency(request, code, *args, **kwargs):
-    if code not in CURRENCIES:
-        return HttpResponseNotFound()
+@api_view(['GET'])
+def get_weather(request, latitude, longitude, *args, **kwargs):
+    if f'{latitude}:{longitude}' in redis_instance:
+        return Response(json.loads(redis_instance.get(f'{latitude}:{longitude}')))
+    try:
+        weather = client_weather.get_weather(latitude, longitude)
+    except HTTPError:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    redis_instance.set(f'{latitude}:{longitude}', json.dumps(weather), REDIS_EXPIRATION_TIME)
+    return Response(weather)
+
+
+@api_view(['GET'])
+def get_currency(request, code, *args, **kwargs):
     if code in redis_instance:
-        return HttpResponse(redis_instance.get(code))
-    async with aiohttp.ClientSession() as session:
-        async with session.get('https://www.cbr-xml-daily.ru/daily_json.js') as resp:
-            try:
-                data = await resp.read()
-            except:
-                return HttpResponseNotFound()
-            currencies = json.loads(data)
-            currency = f'{currencies["Valute"][CURRENCIES[code]]["Nominal"]} {CURRENCIES[code]} = {currencies["Valute"][CURRENCIES[code]]["Value"]} RUB'
-            redis_instance.set(code, currency, 15)
-            return HttpResponse(currency)
+        return Response(json.loads(redis_instance.get(code)))
+    try:
+        currency = client_currency.get_currency(code)
+    except HTTPError:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    redis_instance.set(code, json.dumps(currency), REDIS_EXPIRATION_TIME)
+    return Response(currency)
+

@@ -9,7 +9,6 @@ https://docs.djangoproject.com/en/3.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.2/ref/settings/
 """
-
 import os
 from pathlib import Path
 
@@ -44,6 +43,7 @@ INSTALLED_APPS = [
     "drf_yasg",
     "rest_framework",
     "core.apps.CoreConfig",
+    "django_celery_beat",
 ]
 
 MIDDLEWARE = [
@@ -74,7 +74,7 @@ TEMPLATES = [
     },
 ]
 
-ASGI_APPLICATION = "backend.asgi.application"
+WSGI_APPLICATION = "backend.wsgi.application"
 
 
 # Database
@@ -146,8 +146,13 @@ CELERY_RESULT_BACKEND = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
 CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_RESULT_EXPIRES = 7*86400
+CELERY_SEND_EVENTS = True
+CELERYBEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
+
+
 
 
 

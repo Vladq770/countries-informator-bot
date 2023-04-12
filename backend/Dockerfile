@@ -1,8 +1,19 @@
 FROM python:3.9.10-slim as builder
 
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+ENV STAGE=${STAGE} \
+  POETRY_VERSION=1.0.0
+
+# System deps:
+RUN pip install "poetry==$POETRY_VERSION"
+
+# Copy only requirements to cache them in docker layer
+COPY ./poetry.lock ./pyproject.toml ./
+
+# Project initialization:
+RUN poetry config virtualenvs.create false \
+  && poetry install $(test "$STAGE" == production && echo "--no-dev") --no-interaction --no-ansi
+
 COPY . .
 
 # copy entrypoint.sh
@@ -14,4 +25,4 @@ COPY . /app
 # run entrypoint.sh
 ENTRYPOINT ["/app/entrypoint.sh"]
 
-CMD ["daphne", "backend.asgi:application", "--bind", "0:7000" ]
+CMD ["gunicorn", "backend.wsgi:application", "--bind", "0:7000" ]
